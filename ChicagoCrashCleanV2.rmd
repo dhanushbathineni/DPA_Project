@@ -1,0 +1,140 @@
+---
+title: "ChicagoCrashCleanV2"
+author: "DhanushBathineni"
+date: "2024-04-18"
+output: html_document
+---
+```{r}
+crash_data<-read.csv("Traffic_crashes.csv")
+
+```
+```{r}
+crash_data$CRASH_DATE <- as.POSIXct(crash_data$CRASH_DATE, format="%d/%m/%Y %I:%M:%S %p", tz="America/Chicago")
+cutoff_datetime <- as.POSIXct("01/01/2020 12:00:00 AM", format="%d/%m/%Y %I:%M:%S %p", tz="America/Chicago")
+library(dplyr)
+
+crash_data <- crash_data %>%
+  filter(CRASH_DATE >= cutoff_datetime)
+
+```
+#initial data exploration
+```{r}
+#first few rows of data
+head(crash_data$CRASH_DATE)
+#we can see that attributes such as latitude and longitude are missing
+```
+```{r}
+#dimensions of the data
+dim(crash_data)
+#there are 817476 rows and 48 columns
+```
+```{r}
+#data structures and types
+str(crash_data)
+```
+```{r}
+#summary of the data
+summary(crash_data)
+```
+```{r}
+#lets check for missing values
+sum(is.na(crash_data))
+```
+```{r}
+sapply(crash_data, function(x) sum(is.na(x)))
+```
+```{r}
+crash_data$INJURIES_TOTAL[is.na(crash_data$INJURIES_TOTAL)] <- mode(crash_data$INJURIES_TOTAL)
+crash_data$INJURIES_FATAL[is.na(crash_data$INJURIES_FATAL)] <- mode(crash_data$INJURIES_FATAL)
+crash_data$INJURIES_INCAPACITATING[is.na(crash_data$INJURIES_INCAPACITATING)] <- mode(crash_data$INJURIES_INCAPACITATING)
+crash_data$INJURIES_NON_INCAPACITATING[is.na(crash_data$INJURIES_NON_INCAPACITATING)] <- mode(crash_data$INJURIES_NON_INCAPACITATING)
+crash_data$INJURIES_REPORTED_NOT_EVIDENT[is.na(crash_data$INJURIES_REPORTED_NOT_EVIDENT)] <- mode(crash_data$INJURIES_REPORTED_NOT_EVIDENT)
+crash_data$INJURIES_NO_INDICATION[is.na(crash_data$INJURIES_NO_INDICATION)] <- mode(crash_data$INJURIES_NO_INDICATION)
+crash_data$INJURIES_UNKNOWN[is.na(crash_data$INJURIES_UNKNOWN)] <- mode(crash_data$INJURIES_UNKNOWN)
+# Convert injury-related columns to numeric
+crash_data$INJURIES_TOTAL <- as.numeric(crash_data$INJURIES_TOTAL)
+crash_data$INJURIES_FATAL <- as.numeric(crash_data$INJURIES_FATAL)
+crash_data$INJURIES_INCAPACITATING <- as.numeric(crash_data$INJURIES_INCAPACITATING)
+crash_data$INJURIES_NON_INCAPACITATING <- as.numeric(crash_data$INJURIES_NON_INCAPACITATING)
+crash_data$INJURIES_REPORTED_NOT_EVIDENT <- as.numeric(crash_data$INJURIES_REPORTED_NOT_EVIDENT)
+crash_data$INJURIES_NO_INDICATION <- as.numeric(crash_data$INJURIES_NO_INDICATION)
+crash_data$INJURIES_UNKNOWN <- as.numeric(crash_data$INJURIES_UNKNOWN)
+# Remove rows with non-numeric values in injury-related columns
+crash_data <- crash_data[complete.cases(crash_data[, c("INJURIES_TOTAL", "INJURIES_FATAL", "INJURIES_INCAPACITATING", "INJURIES_NON_INCAPACITATING", "INJURIES_REPORTED_NOT_EVIDENT", "INJURIES_NO_INDICATION", "INJURIES_UNKNOWN")]), ]
+```
+
+```{r}
+sapply(crash_data, function(x) sum(is.na(x)))
+
+```
+```{r}
+crash_data$LOCATION
+```
+```{r}
+library(dplyr)
+
+
+# Removing multiple columns named "column1" and "column2"
+crash_data <- select(crash_data, -c(CRASH_RECORD_ID, REPORT_TYPE,LOCATION,CRASH_DATE_EST_I,DOORING_I,LANE_CNT
+,NUM_UNITS,DATE_POLICE_NOTIFIED,WORK_ZONE_I,WORK_ZONE_TYPE,WORKERS_PRESENT_I,PHOTOS_TAKEN_I,STATEMENTS_TAKEN_I,INTERSECTION_RELATED_I,NOT_RIGHT_OF_WAY_I,HIT_AND_RUN_I))
+dim(crash_data)
+```
+```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+
+# Define the geocoding function
+geocode_address <- function(address) {
+  base_url <- "https://nominatim.openstreetmap.org/search"
+  response <- GET(url = base_url, query = list(q = address, format = "json", limit = 1))
+  data <- fromJSON(rawToChar(response$content), simplifyVector = FALSE)
+  
+  if (length(data) == 0 || is.null(data[[1]])) {
+    return(c(LONGITUDE = NA, LATITUDE = NA))
+  }
+  
+  lon <- as.numeric(data[[1]]$lon)
+  lat <- as.numeric(data[[1]]$lat)
+  
+  if (is.na(lon) || is.na(lat)) {
+    return(c(LONGITUDE = NA, LATITUDE = NA))
+    print(paste("Invalid coordinates for address:", address))
+   
+  }
+   print(paste("Successfully geocoded address:", address, "Longitude:", lon, "Latitude:", lat))
+  
+  Sys.sleep(1)  # Respect the usage policy
+  return(c(LONGITUDE = lon, LATITUDE = lat))
+}
+
+# Prepare the full addresses
+crash_data$full_address <- paste(crash_data$STREET_NO, crash_data$STREET_DIRECTION,
+                                 crash_data$STREET_NAME, "Chicago, IL", sep = " ")
+
+# Identify rows with missing latitude or longitude
+rows_with_na <- which(is.na(crash_data$LATITUDE) | is.na(crash_data$LONGITUDE))
+
+# Geocode only the missing coordinates
+results <- setNames(data.frame(matrix(ncol = 2, nrow = length(rows_with_na))), c("LONGITUDE", "LATITUDE"))
+for (i in seq_along(rows_with_na)) {
+  row_index <- rows_with_na[i]
+  geocode_result <- geocode_address(crash_data$full_address[row_index])
+  results[i, ] <- geocode_result
+}
+
+# Update the original dataframe
+crash_data[rows_with_na, c("LONGITUDE", "LATITUDE")] <- results
+
+# Optionally, check some of the updated rows to ensure accuracy
+head(crash_data)
+
+```
+```{r}
+head(crash_data)
+
+```
+```{r}
+write.csv(crash_data, "cleaned_crash_data.csv", row.names = FALSE)
+
+```

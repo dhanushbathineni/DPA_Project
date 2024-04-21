@@ -1,0 +1,504 @@
+---
+title: "ChicagoCrash"
+author: "DhanushBathineni"
+date: "2024-04-17"
+output: html_document
+---
+
+```{r}
+crash_data<-read.csv("D:\\study\\CSP571-DPA\\ChicagoCrashData\\cleaned_crash_data.csv",header = TRUE)
+crash_data
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+# Convert CRASH_DATE to POSIXct format
+crash_data$CRASH_DATE <- as.POSIXct(crash_data$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+
+# Extract hour, day of week, and month from CRASH_DATE
+crash_data$hour <- hour(crash_data$CRASH_DATE)
+crash_data$day_of_week <- wday(crash_data$CRASH_DATE, label = TRUE)
+crash_data$month <- month(crash_data$CRASH_DATE, label = TRUE)
+
+# Identify the most common causes of traffic crashes
+cause_freq <- table(crash_data$SEC_CONTRIBUTORY_CAUSE)
+cause_prop <- prop.table(cause_freq)
+top_causes <- head(sort(cause_prop, decreasing = TRUE), 10)
+
+# Create a data frame for top crash causes
+top_causes_crash_data <- data.frame(
+  cause = names(top_causes),
+  prop = as.numeric(top_causes)
+)
+
+# Create a bar plot of top crash causes
+ggplot(top_causes_crash_data, aes(x = reorder(cause, prop), y = prop)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Crash Cause", y = "Proportion", title = "Top 10 Crash Causes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Determine peak times for accidents
+hour_freq <- table(crash_data$hour)
+hour_prop <- prop.table(hour_freq)
+
+# Create a data frame for crash proportions by hour
+hour_prop_crash_data <- data.frame(
+  hour = as.numeric(names(hour_prop)),
+  prop = as.numeric(hour_prop)
+)
+
+# Create a line plot of crash proportions by hour
+ggplot(hour_prop_crash_data, aes(x = hour, y = prop)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Hour of the Day", y = "Proportion", title = "Crash Proportions by Hour")
+
+# Analyze trends over time (2020-2024)
+crash_data$year <- year(crash_data$CRASH_DATE)
+year_freq <- table(crash_data$year)
+year_prop <- prop.table(year_freq)
+
+# Create a data frame for crash proportions by year
+year_prop_crash_data <- data.frame(
+  year = as.numeric(names(year_prop)),
+  prop = as.numeric(year_prop)
+)
+
+# Create a line plot of crash proportions by year
+ggplot(year_prop_crash_data, aes(x = year, y = prop)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Year", y = "Proportion", title = "Crash Proportions by Year")
+
+```
+```{r}
+colnames(crash_data)
+
+```
+
+```{r}
+# Group by crash cause and sum the total injuries
+injuries_by_cause <- crash_data %>%
+  group_by(SEC_CONTRIBUTORY_CAUSE) %>%
+  summarise(total_injuries = sum(INJURIES_TOTAL))
+
+# Sort the data by total injuries in descending order
+injuries_by_cause <- injuries_by_cause %>%
+  arrange(desc(total_injuries))
+
+# Select the top 10 crash causes by total injuries
+top_causes <- head(injuries_by_cause, 10)
+
+# Create a bar plot of total injuries by crash cause
+ggplot(top_causes, aes(x = reorder(SEC_CONTRIBUTORY_CAUSE, total_injuries), y = total_injuries)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Crash Cause", y = "Total Injuries", title = "Total Injuries by Top 10 Crash Causes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+library(ggplot2)
+# Create a combined 'street_address' column
+crash_data$street_address <- paste(crash_data$STREET_NO, crash_data$STREET_DIRECTION, crash_data$STREET_NAME, "Chicago")
+
+# Calculate the frequency of crashes by street address
+street_freq <- table(crash_data$street_address)
+street_prop <- prop.table(street_freq)
+
+# Create a data frame with street addresses and crash frequencies
+street_crash_data <- data.frame(
+  street = names(street_freq),
+  freq = as.numeric(street_freq)
+)
+
+# Sort the data frame by crash frequency in descending order
+street_crash_data <- street_crash_data[order(-street_crash_data$freq), ]
+
+# Select the top 20 streets with the highest crash frequencies
+top_streets <- head(street_crash_data, 20)
+
+# Create a bar plot of crash frequencies for the top 20 streets
+ggplot(top_streets, aes(x = reorder(street, freq), y = freq)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Street Address", y = "Crash Frequency", title = "Top 20 Streets with Highest Crash Frequencies") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Assuming 'crash_data' is your dataset and it has a column 'STREET_NAME' and each row represents a crash
+
+# Aggregate the crash data by street name to get the total crashes per street
+crash_counts <- crash_data %>%
+  group_by(STREET_NAME) %>%
+  summarise(Total_Crashes = n()) %>%
+  ungroup() %>%
+  arrange(desc(Total_Crashes))
+
+# Filter for the top 20 streets
+top_20_streets <- head(crash_counts, 20)
+
+# Create the bar plot
+ggplot(top_20_streets, aes(x = reorder(STREET_NAME, Total_Crashes), y = Total_Crashes)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top 20 Streets with Highest Crash Frequencies", x = "Street Name", y = "Crash Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) # Rotate x-axis labels for readability
+
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)  # For easy date handling
+library(dplyr)
+library(lubridate)
+
+crash_data$CRASH_DATE <- as.Date(crash_data$CRASH_DATE, format = "%Y-%m-%d")  # Format if needed
+
+# Create a Year column
+crash_data$Year <- year(crash_data$CRASH_DATE)
+
+# Check the range and unique values of years
+range(crash_data$Year)
+unique(crash_data$Year)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Filter data to exclude unwanted years, assuming 2019 should not be present
+crash_data <- crash_data %>% filter(Year != 2019)
+
+# Optionally, explicitly include only the years you want
+crash_data <- crash_data %>% filter(Year %in% c(2020, 2021, 2022, 2023))
+
+# Check for NA values in LATITUDE and LONGITUDE for specific years
+crash_data %>% 
+  filter(Year %in% c(2023, 2024)) %>% 
+  summarise(Count_NA_Latitude = sum(is.na(LATITUDE)), 
+            Count_NA_Longitude = sum(is.na(LONGITUDE)))
+
+# Plotting the data with adjustments
+ggplot(crash_data, aes(x = LONGITUDE, y = LATITUDE)) +
+  geom_point(alpha = 0.5, color = "red", size = 1) +
+  facet_wrap(~Year, nrow = 2) +
+  labs(title = "Yearly Scatterplot of Crashes",
+       x = "Longitude",
+       y = "Latitude",
+       caption = "Data by Year") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 16),
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12)) +
+  scale_x_continuous(limits = c(-88, -87.5), expand = c(0, 0)) +  # Adjust x-axis limits and remove expansion
+  scale_y_continuous(limits = c(41.6, 42.1), expand = c(0, 0))    # Adjust y-axis limits and remove expansion
+
+# Display the plot in the RStudio viewer or R GUI
+print(ggplot(crash_data, aes(x = LONGITUDE, y = LATITUDE)) +
+        geom_point(alpha = 0.5, color = "red", size = 1) +
+        facet_wrap(~Year, nrow = 2) +
+        labs(title = "Yearly Scatterplot of Crashes",
+             x = "Longitude",
+             y = "Latitude",
+             caption = "Data by Year") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5, size = 16),
+              strip.text = element_text(size = 12),
+              axis.text = element_text(size = 10),
+              axis.title = element_text(size = 12)) +
+        scale_x_continuous(limits = c(-88, -87.5), expand = c(0, 0)) +
+        scale_y_continuous(limits = c(41.6, 42.1), expand = c(0, 0)))
+```
+```{r}
+(crash_data$BEAT_OF_OCCURENCE)
+```
+```{r}
+# Ensure that BEAT_OF_OCCURENCE is a factor
+crash_data$BEAT_OF_OCCURENCE <- as.factor(crash_data$BEAT_OF_OCCURENCE)
+
+# Check the data type again
+str(crash_data$BEAT_OF_OCCURENCE)
+# If you are defining custom colors, ensure that you map them correctly
+N_BEATS <- length(levels(crash_data$BEAT_OF_OCCURENCE))
+beat_pal <- colorRampPalette(RColorBrewer::brewer.pal(min(N_BEATS, 9), "Set1"))(N_BEATS)
+
+# Map colors to beats
+beat_cmp <- setNames(beat_pal, levels(crash_data$BEAT_OF_OCCURENCE))
+beat_cmp["211"] <- "#000000"  # Setting a specific color for beat '211' which would be around IIT
+
+ggplot(crash_data, aes(x = LONGITUDE, y = LATITUDE, color = BEAT_OF_OCCURENCE)) +
+    geom_point(alpha = 0.6) +  # Adjust the alpha for transparency if needed
+    scale_color_manual(values = beat_cmp) +  # Assuming 'beat_cmp' is already defined
+    scale_x_continuous(limits = c(-88, -87.5), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(41.6, 42.1), expand = c(0, 0)) +
+    labs(title = "Mapped Police Beats", x = "Longitude", y = "Latitude") +
+    theme_minimal() +
+    theme(legend.position = "none")
+
+```
+```{r}
+library(dplyr)
+
+# Add an EVENT column that marks each row as one event
+crash_data$EVENT <- 1
+# Summing events and calculating average longitude and latitude per beat and year
+event_count_by_beat <- crash_data %>%
+  group_by(BEAT_OF_OCCURENCE, Year) %>%
+  summarise(Total_Crashes = n(),  # Count rows as events
+            Avg_Longitude = mean(LONGITUDE, na.rm = TRUE),  # Average longitude per beat
+            Avg_Latitude = mean(LATITUDE, na.rm = TRUE),  # Average latitude per beat
+            .groups = 'drop')
+library(ggplot2)
+years <- unique(event_count_by_beat$Year)
+for (year in years) {
+  plot_data <- filter(event_count_by_beat, Year == year)
+  p_year <- ggplot(plot_data, aes(x = Avg_Longitude, y = Avg_Latitude, color = Total_Crashes)) +
+    geom_point(alpha = 0.8, size = 4) +
+    scale_color_gradient(low = "blue", high = "red", name = "Total Crashes") +
+    labs(title = paste("Count of Crashes by Police Beat in", year),
+         x = "Average Longitude", y = "Average Latitude") +
+    scale_x_continuous(limits = c(-88, -87.5), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(41.6, 42.1), expand = c(0, 0)) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 20, face = "bold"),
+      axis.title = element_text(size = 16),
+      axis.text = element_text(size = 12),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 12)
+    )
+  print(p_year)
+  ggsave(sprintf("police_beats_crashes_%s.png", year), plot = p_year, width = 24, height = 20, units = "in", dpi = 300)
+}
+
+
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Calculate the number of crashes per beat and year
+crash_counts <- crash_data %>%
+  group_by(BEAT_OF_OCCURENCE, Year) %>%
+  summarise(Total_Crashes = n(), .groups = 'drop')
+
+# Join this summary back to the original data for visualization purposes
+crash_data <- crash_data %>%
+  left_join(crash_counts, by = c("BEAT_OF_OCCURENCE", "Year"))
+library(ggplot2)
+library(dplyr)
+
+# Get a vector of unique years
+years <- unique(crash_data$Year)
+
+# Loop through each year to create and save plots
+for (year in years) {
+  yearly_data <- crash_data %>% 
+    filter(Year == year) %>%
+    group_by(LONGITUDE, LATITUDE) %>%
+    summarise(Total_Crashes = n(), .groups = 'drop') # Summarize crash counts per location
+  
+  p <- ggplot(yearly_data, aes(x = LONGITUDE, y = LATITUDE, fill = Total_Crashes)) +
+    geom_point(shape = 21, color = "black", size = 1, stroke = 0.5, alpha = 0.4) +
+    scale_fill_gradient(low = "pink", high = "red", name = "Crash Count") +
+    theme_minimal() +
+      scale_x_continuous(limits = c(-88, -87.5), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(41.6, 42.1), expand = c(0, 0)) +
+    labs(title = paste("Count of Crashes by Police Beat in the Year", year),
+         x = "Longitude", y = "Latitude") +
+    theme(legend.position = "right") +
+    coord_fixed(ratio = 1)
+  
+  # Save the plot with specified dimensions
+  ggsave(paste0("crashes_", year, ".png"), plot = p, width = 12, height = 10, units = "in", dpi = 300)
+  
+  # Optionally, print the plot to the R console
+  print(p)
+}
+
+```
+
+Lets check the Infuluence of Alcohol/DRUGS in the crashes
+```{r}
+library(dplyr)
+library(ggplot2)
+library(dplyr)
+
+# Assuming crash_data is your dataset
+result <- crash_data %>%
+  filter(SEC_CONTRIBUTORY_CAUSE == "UNDER THE INFLUENCE OF ALCOHOL/DRUGS (USE WHEN ARREST IS EFFECTED)" | 
+         SEC_CONTRIBUTORY_CAUSE == "HAD BEEN DRINKING (USE WHEN ARREST IS NOT MADE)") %>%
+  summarise(number_of_crashes = n())
+
+# Display the result
+print(result)
+
+# Ensure your 'CRASH_DATE' is in Date format
+crash_data$CRASH_DATE <- as.Date(crash_data$CRASH_DATE, format = "%Y-%m-%d")  # Adjust the format as needed
+crash_data$year <- format(crash_data$CRASH_DATE, "%Y")  # Extract year
+
+# Filter and aggregate the data
+yearly_crash_data <- crash_data %>%
+  filter(SEC_CONTRIBUTORY_CAUSE == "UNDER THE INFLUENCE OF ALCOHOL/DRUGS (USE WHEN ARREST IS EFFECTED)" |
+         SEC_CONTRIBUTORY_CAUSE == "HAD BEEN DRINKING (USE WHEN ARREST IS NOT MADE)") %>%
+  group_by(year) %>%
+  summarise(number_of_crashes = n())
+
+# Display the result
+print(yearly_crash_data)
+
+```
+Now lets see monthly occurences
+```{r}
+crash_data$month <- format(crash_data$CRASH_DATE, "%m")  # "%m" gives the month as "01", "02", etc.
+monthly_data <- crash_data %>%
+    filter(SEC_CONTRIBUTORY_CAUSE == "UNDER THE INFLUENCE OF ALCOHOL/DRUGS (USE WHEN ARREST IS EFFECTED)" | SEC_CONTRIBUTORY_CAUSE == "HAD BEEN DRINKING (USE WHEN ARREST IS NOT MADE)") %>%
+    group_by(month) %>%
+    summarise(crashes = n())
+monthly_data$month <- factor(monthly_data$month, levels = c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"))
+ggplot(monthly_data, aes(x = month, y = crashes, fill = month)) +
+    geom_bar(stat = "identity") +
+    scale_fill_brewer(palette = "Paired", name = "Month") +
+    theme_minimal() +
+    labs(title = "Monthly Distribution of Crashes Due to Alcohol/Drugs",
+         x = "Month",
+         y = "Number of Crashes") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Now lets see the leading cause of crashes
+```{r}
+library(dplyr)
+
+# Aggregate the data by primary contributory cause
+cause_counts <- crash_data %>%
+  group_by(SEC_CONTRIBUTORY_CAUSE) %>%
+  summarise(number_of_crashes = n()) %>%
+  arrange(desc(number_of_crashes))
+
+# Display the sorted result
+print(cause_counts)
+```
+
+```{r}
+crash_data$month <- format(crash_data$CRASH_DATE, "%m")  # Ensure 'month' is in the correct format
+crash_data$season <- ifelse(crash_data$month %in% c("12", "01", "02"), "Winter",
+                            ifelse(crash_data$month %in% c("03", "04", "05"), "Spring",
+                                   ifelse(crash_data$month %in% c("06", "07", "08"), "Summer", "Fall")))
+seasonal_data <- crash_data %>%
+  group_by(season) %>%
+  summarise(crashes = n())
+ggplot(seasonal_data, aes(x = season, y = crashes, fill = season)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  labs(title = "Seasonal Distribution of Crashes",
+       x = "Season",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Creating a contingency table
+seasonal_table <- table(crash_data$season)
+seasonal_table
+# Performing the Chi-squared test
+chisq_test <- chisq.test(seasonal_table)
+chisq_test
+#chi-squared test reveals that season does not play much factor in overall crashes
+```
+
+Now lets see if that holds in crashes where primary reason is WEATHER_CONDITION
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Assuming crash_data is your dataset and 'WEATHER_CONDITION' is the column of interest
+# Aggregate the data by WEATHER_CONDITION condition
+WEATHER_CONDITION_crashes <- crash_data %>%
+  group_by(WEATHER_CONDITION) %>%
+  summarise(number_of_crashes = n()) %>%
+  arrange(desc(number_of_crashes))  # Optional: arrange in descending order of crashes
+
+# Create a bar plot
+ggplot(WEATHER_CONDITION_crashes, aes(x = reorder(WEATHER_CONDITION, number_of_crashes), y = number_of_crashes, fill = WEATHER_CONDITION)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Number of Crashes by WEATHER_CONDITION Condition",
+       x = "WEATHER_CONDITION Condition",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_brewer(palette = "Paired")  # Optional: Use a color palette for aesthetic improvement
+
+# Print the plot
+print(ggplot)
+
+```
+WEATHER_CONDITION when PRIM_CONTRIBUTORY_CAUSE is weather
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Filter for crashes where primary contributory cause is weather-related
+weather_related_crashes <- crash_data %>%
+  filter(grepl("WEATHER", SEC_CONTRIBUTORY_CAUSE, ignore.case = TRUE))  # Adjust as necessary for exact matching
+
+# Aggregate the data by weather condition
+weather_conditions <- weather_related_crashes %>%
+  group_by(WEATHER_CONDITION) %>%
+  summarise(number_of_crashes = n()) %>%
+  arrange(desc(number_of_crashes))  # This sorts the conditions by the number of crashes
+
+# Create a bar plot
+ggplot(weather_conditions, aes(x = reorder(WEATHER_CONDITION, number_of_crashes), y = number_of_crashes, fill = WEATHER_CONDITION)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Crash Counts by Weather Condition for Weather-Related Causes",
+       x = "Weather Condition",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_brewer(palette = "Paired")  # Optional: Adds a color palette
+
+# Print the plot
+print(ggplot)
+
+```
+
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Filter for crashes where secondary contributory cause is weather-related
+weather_related_crashes <- crash_data %>%
+  filter(grepl("WEATHER", SEC_CONTRIBUTORY_CAUSE, ignore.case = TRUE))  # Adjust as necessary for exact matching
+
+# Aggregate the data by weather condition
+weather_conditions <- weather_related_crashes %>%
+  group_by(WEATHER_CONDITION) %>%
+  summarise(number_of_crashes = n()) %>%
+  arrange(desc(number_of_crashes))  # This sorts the conditions by the number of crashes
+
+# Create a bar plot
+ggplot(weather_conditions, aes(x = reorder(WEATHER_CONDITION, number_of_crashes), y = number_of_crashes, fill = WEATHER_CONDITION)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Crash Counts by Weather Condition for Weather-Related Causes",
+       x = "Weather Condition",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_brewer(palette = "Paired")  # Optional: Adds a color palette
+
+# Print the plot
+print(ggplot)
+
+```
+

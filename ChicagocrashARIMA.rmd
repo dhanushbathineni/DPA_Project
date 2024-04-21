@@ -1,0 +1,193 @@
+---
+title: "chicagoARIMA"
+author: "DhanushBathineni"
+date: "2024-04-20"
+output: html_document
+---
+
+```{r}
+crash_data<-read.csv("D:\\study\\CSP571-DPA\\ChicagoCrashData\\cleaned_crash_data.csv",header = TRUE)
+crash_data
+```
+```{r}
+cutoff_datetime <- as.POSIXct("01/01/2020 12:00:00 AM", format="%d/%m/%Y %I:%M:%S %p", tz="America/Chicago")
+atmost_cutoff_datetime <- as.POSIXct("01/01/2024 12:00:00 AM", format="%d/%m/%Y %I:%M:%S %p", tz="America/Chicago")
+
+library(dplyr)
+
+crash_data <- crash_data %>%
+  filter(CRASH_DATE >= cutoff_datetime )
+crash_data<-crash_data %>% filter(CRASH_DATE<atmost_cutoff_datetime)
+
+```
+```{r}
+unique(year(crash_data$CRASH_DATE))
+dim(crash_data)
+```
+```{r}
+sapply(crash_data, function(x) sum(is.na(x)))
+```
+
+```{r}
+crash_data<-na.omit(crash_data)
+sapply(crash_data, function(x) sum(is.na(x)))
+
+```
+```{r}
+crash_data
+```
+```{r}
+write.csv(crash_data, "cleaned_crash_data.csv", row.names = FALSE)
+
+```
+
+
+ARIMA
+```{r}
+
+# Convert the 'CRASH_DATE' column to a Date object
+crash_data$CRASH_DATE <- as.Date(crash_data$CRASH_DATE, format = "%Y-%m-%d")  # Adjust the format if necessary
+
+# Extract the year and month from the 'CRASH_DATE' column
+crash_data$CRASH_YEAR <- format(crash_data$CRASH_DATE, "%Y")
+crash_data$CRASH_MONTH <- format(crash_data$CRASH_DATE, "%m")
+
+# Aggregate the data by year and month
+aggregated_data <- aggregate(INJURIES_TOTAL ~ CRASH_YEAR + CRASH_MONTH, data = crash_data, FUN = sum)
+
+# Create a Date object representing the first day of each month
+aggregated_data$CRASH_DATE <- as.Date(paste(aggregated_data$CRASH_YEAR, aggregated_data$CRASH_MONTH, "01", sep = "-"))
+
+# Create a time series object
+crash_ts <- ts(aggregated_data$INJURIES_TOTAL, start = c(min(aggregated_data$CRASH_YEAR), min(aggregated_data$CRASH_MONTH)), frequency = 12)
+
+# Print the resulting time series object
+print(crash_ts)
+```
+
+EDA for ARIMA
+```{r}
+
+# Plot the time series
+plot(crash_ts, main = "Monthly Injuries from Traffic Crashes", xlab = "Time", ylab = "Number of Injuries")
+
+# Decompose the time series into trend, seasonal, and random components
+decomposed <- decompose(crash_ts)
+plot(decomposed)
+
+# Check for stationarity using the Augmented Dickey-Fuller (ADF) test
+adf_test <- adf.test(crash_ts)
+print(adf_test)
+
+# Check for stationarity using the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test
+kpss_test <- kpss.test(crash_ts)
+print(kpss_test)
+
+# Plot the ACF and PACF
+acf(crash_ts, main = "ACF of Crash Time Series")
+pacf(crash_ts, main = "PACF of Crash Time Series")
+
+# Perform differencing if the time series is not stationary
+if (adf_test$p.value > 0.05 || kpss_test$p.value < 0.05) {
+  crash_ts_diff <- diff(crash_ts)
+  plot(crash_ts_diff, main = "Differenced Crash Time Series", xlab = "Time", ylab = "Number of Injuries")
+  
+  # Recheck stationarity after differencing
+  adf_test_diff <- adf.test(crash_ts_diff)
+  print(adf_test_diff)
+  
+  kpss_test_diff <- kpss.test(crash_ts_diff)
+  print(kpss_test_diff)
+  
+  # Plot ACF and PACF of the differenced series
+  acf(crash_ts_diff, main = "ACF of Differenced Crash Time Series")
+  pacf(crash_ts_diff, main = "PACF of Differenced Crash Time Series")
+}
+```
+
+
+```{r}
+# Install and load the necessary packages
+# install.packages("forecast")
+library(forecast)
+
+#we'll use an ARIMA(1, 1, 0) model
+arima_model <- arima(crash_ts, order = c(1, 1, 0))
+
+# Print the model summary
+summary(arima_model)
+
+# Check the residuals of the fitted model
+checkresiduals(arima_model)
+
+# Plotting the residuals
+plot(arima_model$residuals, main = "Residuals of ARIMA(1, 1, 0) Model")
+acf(arima_model$residuals, main = "ACF of Residuals")
+pacf(arima_model$residuals, main = "PACF of Residuals")
+
+# Perform model validation
+# Split the data into training and testing sets
+train_data <- window(crash_ts, end = c(2022, 12))
+test_data <- window(crash_ts, start = c(2023, 1), end = c(2023, 12))
+
+
+# Fit the ARIMA model on the training data
+arima_model_train <- arima(train_data, order = c(1, 1, 0))
+
+# Make predictions on the testing data
+arima_forecast <- forecast(arima_model_train, h = length(test_data))
+
+# Plot the forecasted values against the actual values
+plot(arima_forecast, main = "ARIMA(1, 1, 0) Forecast vs. Actual")
+lines(test_data, col = "red")
+
+# Calculate forecast accuracy metrics
+accuracy(arima_forecast, test_data)
+```
+
+
+```{r}
+# Fit a SARIMA model
+sarima_model <- auto.arima(train_data, seasonal = TRUE)
+
+# Print the model summary
+summary(sarima_model)
+
+# Make predictions on the testing data
+sarima_forecast <- forecast(sarima_model, h = length(test_data))
+
+# Plot the forecasted values against the actual values
+plot(sarima_forecast, main = "SARIMA Forecast vs. Actual")
+lines(test_data, col = "red")
+
+# Calculate forecast accuracy metrics
+accuracy(sarima_forecast, test_data)
+```
+
+
+```{r}
+# Print the start and end of the time series
+print(start(crash_ts))
+print(end(crash_ts))
+if (all(start(crash_ts) <= c(2023, 1)) && all(end(crash_ts) >= c(2023, 1))) {
+    test_data <- window(crash_ts, start=c(2023, 1))
+} else {
+    stop("Specified start date for the test data is out of range.")
+}
+
+# Verify the adjusted window
+print(start(test_data))
+print(end(test_data))
+sarima_forecast <- forecast(sarima_model, h = length(test_data))
+
+# Plot the forecast against the actual values
+plot(sarima_forecast)
+lines(test_data, col = "red")
+
+# Calculate forecast accuracy
+accuracy(sarima_forecast, test_data)
+
+
+
+```
+

@@ -1,0 +1,400 @@
+---
+title: "ChicagoCrashes2"
+author: "DhanushBathineni"
+date: "2024-04-19"
+output: html_document
+---
+```{r}
+crash_data<-read.csv("D:\\study\\CSP571-DPA\\ChicagoCrashData\\cleaned_crash_data.csv",header = TRUE)
+crash_data
+
+```
+```{r}
+library(dplyr)
+
+# View the first few rows of the dataset
+head(crash_data)
+
+# Get a summary of the dataset
+summary(crash_data)
+
+# Check structure of the dataset
+str(crash_data)
+
+```
+```{r}
+# Example: Remove rows with any missing values
+crash_data <- na.omit(crash_data)
+
+# Convert CRASH_DATE to POSIXct format
+crash_data$CRASH_DATE <- as.POSIXct(crash_data$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+
+# Extract hour, day of week, and month from CRASH_DATE
+crash_data$hour <- hour(crash_data$CRASH_DATE)
+crash_data$day_of_week <- wday(crash_data$CRASH_DATE, label = TRUE)
+crash_data$month <- month(crash_data$CRASH_DATE, label = TRUE)
+
+
+```
+
+```{r}
+summary(crash_data)
+```
+```{r}
+# Summary statistics for a specific column
+summary(crash_data$PRIM_CONTRIBUTORY_CAUSE)
+
+# Count the number of crashes by category
+crash_data %>%
+  group_by(PRIM_CONTRIBUTORY_CAUSE) %>%
+  summarize(count = n())
+
+```
+```{r}
+library(ggplot2)
+
+# Histogram of crashes by date
+ggplot(crash_data, aes(x = CRASH_DATE)) +
+  geom_histogram(stat = "count")
+
+# Boxplot for a numerical attribute
+ggplot(crash_data, aes(y = INJURIES_TOTAL)) +
+  geom_boxplot()
+
+
+
+```
+```{r}
+library(lubridate)
+
+# Assuming your data has a 'date_time' column in datetime format
+crash_data$CRASH_DATE <- as.POSIXct(crash_data$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+# Extract hour, day of week, and month from CRASH_DATE
+crash_data$hour <- hour(crash_data$CRASH_DATE)
+crash_data$day_of_week <- wday(crash_data$CRASH_DATE, label = TRUE)
+crash_data$month <- month(crash_data$CRASH_DATE, label = TRUE)
+crash_data$year<-year(crash_data$CRASH_DATE)
+
+crash_data$weekday <- wday(crash_data$CRASH_DATE, label = TRUE)  # Weekday with labels
+crash_data$is_weekend <- ifelse(crash_data$weekday %in% c("Sat", "Sun"), 1, 0)  # Binary indicator for weekends
+
+```
+```{r}
+# Example of binning LATITUDE and LONGITUDE into geographic bins
+crash_data$lat_bin <- cut(crash_data$LATITUDE, breaks = seq(from = min(crash_data$LATITUDE), to = max(crash_data$LATITUDE), length.out = 10))
+crash_data$lon_bin <- cut(crash_data$LONGITUDE, breaks = seq(from = min(crash_data$LONGITUDE), to = max(crash_data$LONGITUDE), length.out = 10))
+
+# Creating a 'region' feature based on custom criteria or existing knowledge about areas
+crash_data$region <- ifelse(crash_data$LONGITUDE < -87.6298 & crash_data$LATITUDE > 41.8781, "Region1", "Region2")
+
+```
+```{r}
+# Binary feature for bad weather conditions
+unique(crash_data$WEATHER_CONDITION)
+library(dplyr)
+
+# Modify the dataset by creating a new column for simplified weather categories
+crash_data <- crash_data %>%
+  mutate(weather_category = case_when(
+    WEATHER_CONDITION %in% c("CLEAR", "CLOUDY/OVERCAST") ~ "Clear",
+    WEATHER_CONDITION %in% c("RAIN", "SNOW", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE", "SLEET/HAIL", "FOG/SMOKE/HAZE", "BLOWING SAND, SOIL, DIRT", "SEVERE CROSS WIND GATE") ~ "Adverse",
+    TRUE ~ "Unknown"
+  ))
+# Create a binary indicator for adverse weather conditions
+crash_data <- crash_data %>%
+  mutate(is_adverse_weather = ifelse(WEATHER_CONDITION %in% c("RAIN", "SNOW", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE", "SLEET/HAIL", "FOG/SMOKE/HAZE", "BLOWING SAND, SOIL, DIRT", "SEVERE CROSS WIND GATE"), 1, 0))
+library(ggplot2)
+
+# Bar chart of crash counts by weather category
+ggplot(crash_data, aes(x = weather_category, fill = weather_category)) +
+  geom_bar() +
+  labs(title = "Count of Crashes by Weather Category", x = "Weather Category", y = "Number of Crashes") +
+  theme_minimal()
+
+# Assign a severity score to each weather condition
+crash_data <- crash_data %>%
+  mutate(weather_severity_score = case_when(
+    WEATHER_CONDITION == "CLEAR" ~ 0,
+    WEATHER_CONDITION == "CLOUDY/OVERCAST" ~ 1,
+    WEATHER_CONDITION %in% c("RAIN", "SLEET/HAIL", "FOG/SMOKE/HAZE") ~ 2,
+    WEATHER_CONDITION %in% c("SNOW", "BLOWING SNOW", "FREEZING RAIN/DRIZZLE") ~ 3,
+    WEATHER_CONDITION == "BLOWING SAND, SOIL, DIRT" ~ 4,
+    WEATHER_CONDITION == "SEVERE CROSS WIND GATE" ~ 5,
+    TRUE ~ 0  # 'Unknown' and 'Other' categorized as 0
+  ))
+
+```
+```{r}
+unique(crash_data$MOST_SEVERE_INJURY)
+crash_data$severe_crash <- ifelse(crash_data$MOST_SEVERE_INJURY == "Fatal" | crash_data$MOST_SEVERE_INJURY == "Incapacitating Injury", 1, 0)
+
+
+```
+```{r}
+# Time of day categorization
+crash_data$time_of_day <- cut(crash_data$hour,
+                              breaks = c(-1, 6, 12, 18, 24),
+                              labels = c("Night", "Morning", "Afternoon", "Evening"),
+                              right = TRUE)
+
+```
+```{r}
+# Interaction between weather and time of day
+crash_data$weather_time_interaction <- interaction(crash_data$weather_category, crash_data$time_of_day)
+```
+For conducting a time analysis of crash frequencies using the Chi-Square Test of Independence and ANOVA
+Chi-Square Test of Independence
+Use this test if you want to check whether the frequency of crashes is independent of different times of the day (e.g., categorized as day vs. night).
+```{r}
+crash_data$time_category <- ifelse(crash_data$hour >= 6 & crash_data$hour < 18, "Day", "Night")
+# Creating a contingency table
+time_table <- table(crash_data$time_category)
+
+# Chi-Square Test
+chi_sq_test <- chisq.test(time_table)
+print(chi_sq_test)
+
+```
+ it suggests that there is a statistically significant association between the time of day and crash occurrences. In simpler terms, crash occurrences are not evenly distributed between day and night; one category might have significantly more crashes compared to the other.
+
+ANOVA
+Use ANOVA to compare means of crashes per time interval across multiple groups, such as different days of the week.
+
+```{r}
+crash_data$day_of_week <- weekdays(as.Date(crash_data$CRASH_DATE))
+library(dplyr)
+
+
+# Aggregate data to count the number of crashes per day
+daily_crashes <- crash_data %>%
+  group_by(CRASH_DATE) %>%
+  summarise(num_crashes = n())
+
+# Add a day of the week column
+daily_crashes$day_of_week <- weekdays(daily_crashes$CRASH_DATE)
+# Assuming the data is sufficiently normal for ANOVA; otherwise, consider a transformation or non-parametric test
+anova_result <- aov(num_crashes ~ day_of_week, data = daily_crashes)
+summary(anova_result)
+
+
+```
+ it appears that there is no significant difference in the number of crashes across different days of the week. Let's break down the components of your ANOVA table to better understand the outcome:
+
+ANOVA Table Explained
+Df (Degrees of Freedom):
+day_of_week: 6 - This indicates there are seven categories (seven days of the week, with six degrees of freedom).
+Residuals: 116306 - This is the number of observations minus the number of groups, indicating a large sample size.
+Sum Sq (Sum of Squares):
+day_of_week: 3 - This represents the variation due to the different days of the week.
+Residuals: 129097 - This represents the variation within days, i.e., the error or residual variation.
+Mean Sq (Mean Squares):
+day_of_week: 0.4266 - This is the sum of squares divided by the degrees of freedom for days of the week.
+Residuals: 1.1100 - This is the sum of squares divided by the residual degrees of freedom.
+F value:
+0.384 - This is the ratio of the mean square of the day of the week to the mean square of the residuals. It measures the amount of variance explained by the model relative to the variance not explained by the model.
+Pr(>F):
+0.89 - This is the p-value, which tells us the probability of observing an F-statistic as large as 0.384, assuming the null hypothesis is true (i.e., there is no difference in mean crash counts across different days of the week).
+
+
+Check Assumptions
+```{r}
+# Check for normality of residuals
+plot(residuals(anova_result), main="Residuals Plot")
+install.packages("car")
+# Check for homogeneity of variances
+library(car)
+leveneTest(num_crashes ~ day_of_week, data = daily_crashes)
+
+```
+
+Residuals Plot Observations:
+Homoscedasticity: The residuals seem to be evenly spread across the range of indices, suggesting that the variance of the residuals is constant across observations, which is an assumption of ANOVA. There's no clear pattern of increasing or decreasing variance, which is a good sign.
+Outliers: There are a few outliers, particularly noticeable for residuals with values greater than 10. These are points that do not fit well with the model compared to the majority of the data.
+No Clear Patterns: The residuals do not display any obvious patterns. This suggests that the model does not suffer from non-linearity or misspecified functional form problems.
+Levene's Test for Homogeneity of Variance:
+The Levene’s test checks another assumption of ANOVA: that variances are equal across groups.
+
+Df (Degrees of Freedom):
+group: 6 - This indicates that the test compared variances across the seven days of the week.
+116306: The error degrees of freedom, representing the number of observations minus the number of groups.
+F value: 0.3843 - This is the test statistic for Levene's test, which compares the variance across groups to within groups.
+Pr(>F): 0.8895 - The p-value is much larger than the conventional alpha level of 0.05, suggesting that there is no evidence to reject the null hypothesis of equal variances across groups. This means the variances of the daily crash frequencies are approximately equal for each day of the week, satisfying the homogeneity of variances assumption.
+Overall Assessment:
+The analysis suggests that the assumptions necessary for ANOVA are satisfied. There is homogeneity of variances across groups, and the residuals are approximately normally distributed without obvious patterns. However, the ANOVA itself was not significant, meaning there was no evidence of a difference in crash frequencies across the days of the week.
+```{r}
+library(ggplot2)
+
+# Summarize the data to get the total number of crashes per day of the week
+daily_crashes_summary <- daily_crashes %>%
+  group_by(day_of_week) %>%
+  summarise(total_crashes = sum(num_crashes))
+
+# Bar plot to show the total number of crashes by day of the week
+ggplot(daily_crashes_summary, aes(x = day_of_week, y = total_crashes, fill = day_of_week)) +
+  geom_bar(stat = "identity") +  # Use 'identity' to use the values in 'total_crashes'
+  labs(title = "Total Number of Crashes by Day of the Week", x = "Day of the Week", y = "Total Number of Crashes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis text for readability
+
+```
+
+User
+Location Analysis: To compare different locations (like neighborhoods or districts):
+Chi-Square Test can also be useful here if you're looking at categorical location data.
+Kruskal-Wallis Test, a non-parametric method, if you do not assume normal distribution of crashes across locations.
+```{r}
+# Create a contingency table of crash counts by street name
+street_table <- table(crash_data$STREET_NAME)
+
+# Conduct the Chi-Square Test
+chi_sq_result <- chisq.test(street_table)
+print(chi_sq_result)
+
+```
+
+
+The result of the Chi-squared test you've performed on the street_table suggests that there is a statistically significant association between street names and the number of crashes. Specifically:
+
+X-squared (Chi-squared value): 1455244 - This is a very high chi-squared statistic, indicating a strong association.
+Degrees of Freedom (df): 1374 - This suggests you have a large number of street categories that you've tested.
+P-value: Less than 2.2e-16 - This is the smallest value that can be represented in R for a p-value and indicates that the result is extremely statistically significant.
+Interpretation
+The very small p-value indicates that it is very unlikely that the observed distribution of crashes across the different street names is due to chance. In other words, certain streets have a higher or lower number of crashes than would be expected if crashes were evenly distributed across all streets.
+
+This test result provides a clear indication that location (specifically street names) is an important factor in crash frequency. You now have a strong basis to proceed with further analysis or to develop targeted interventions or policies to improve road safety on the streets that are identified as having a significantly different number of crashes.
+
+
+
+Kruskal-Wallis Test
+The Kruskal-Wallis Test is used when the data do not meet the assumptions of ANOVA. It can handle ordinal data or data that do not follow a normal distribution.
+```{r}
+# Make sure the 'num_crashes' variable reflects the count of crashes per street
+# This might require aggregating your data by 'STREET_NAME'
+crashes_by_street <- crash_data %>%
+  group_by(STREET_NAME) %>%
+  summarise(num_crashes = n())
+
+# Conduct the Kruskal-Wallis Test
+kruskal_result <- kruskal.test(num_crashes ~ STREET_NAME, data = crashes_by_street)
+print(kruskal_result)
+
+```
+
+The p-value being greater than 0.05 suggests that, according to the Kruskal-Wallis test, there's no evidence to reject the null hypothesis. This means that the median number of crashes does not differ significantly across the different streets.
+
+
+Contrast with the Chi-Squared Test Result
+It's important to note that the Chi-squared test and the Kruskal-Wallis test are assessing different hypotheses. The Chi-squared test assesses whether the observed frequencies of crashes across different streets are different from expected frequencies if there was no association between street name and crash frequency. The Kruskal-Wallis test, on the other hand, assesses whether the median number of crashes is the same across different street names.
+
+The discrepancy between the results might arise from:
+
+Different Hypotheses: As mentioned, the tests look at different statistical properties (frequencies vs. medians).
+Data Distribution: The Kruskal-Wallis test's non-significant result suggests that the central tendency (median) of crashes is not different across streets, while the Chi-squared test's significant result suggests that the overall distribution (not just the central tendency) of crashes does differ.
+Effect of Outliers: The Chi-squared test can be sensitive to large counts, which might be driving the significant result. The Kruskal-Wallis test, which uses ranks, is less sensitive to outliers or extreme values.
+
+
+Since there is a contradiction, lets do pairwise comparisons
+```{r}
+library(dunn.test)
+
+# Assuming your data frame is named 'crashes_by_street' and has the columns 'num_crashes' and 'STREET_NAME'
+dunn_result <- dunn.test(crashes_by_street$num_crashes, crashes_by_street$STREET_NAME, method="HOLM")
+
+# View the results
+print(dunn_result)
+
+```
+Dunn Test revealed that there are no statistically significant differences in the median number of crashes between most pairs of streets after adjusting for multiple comparisons.
+Consider Both Statistical and Practical Significance: The lack of statistical significance in the median crash frequency does not negate the importance of the actual numbers of crashes occurring on specific streets. This is where practical significance comes into play, suggesting that while statistically, street names might not predict crashes, practically, certain streets have more crashes and may be of interest for safety improvements.
+
+
+Decompose using moving averages to identify seasonality
+
+Decomposing time series data into its constituent components, such as trend, seasonality, and residual (irregular) components, is a valuable technique in analyzing patterns and making forecasts. Using moving averages is one common approach to smooth out short-term fluctuations and highlight longer-term trends and cycles.
+
+```{r}
+library(forecast)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+# Convert CRASH_DATE to Date type
+crash_data$CRASH_DATE <- ymd_hms(crash_data$CRASH_DATE)
+
+# Aggregate crashes by day
+daily_crashes <- crash_data %>%
+  mutate(date = as.Date(CRASH_DATE)) %>%
+  group_by(date) %>%
+  summarise(daily_count = n())
+
+# Create a ts object
+crash_ts <- ts(daily_crashes$daily_count, frequency=365)
+# Compute moving average (trend)
+# Calculate moving average (trend) with a window of 30 days
+trend <- stats::filter(crash_ts, rep(1/30, 30), sides=2)
+
+# Detrend the data to find seasonality
+detrended <- crash_ts - trend
+
+# Assuming monthly seasonality, compute average seasonal effect
+seasonal_effect <- rep(mean(detrended), length(detrended))
+for (i in 1:12) {
+  monthly_indices <- seq(i, length(detrended), by=12)
+  seasonal_effect[monthly_indices] <- mean(detrended[monthly_indices], na.rm=TRUE)
+}
+
+# Calculate residuals
+residuals <- detrended - seasonal_effect
+
+# Plot original data
+plot(crash_ts, main="Original Data", ylab="Number of Crashes", xlab="Time")
+
+# Plot trend component
+plot(trend, main="Trend Component", ylab="Trend", xlab="Time")
+
+# Plot seasonal component
+plot(seasonal_effect, main="Seasonal Component", ylab="Seasonality", xlab="Time")
+
+# Plot residual component
+plot(residuals, main="Residual Component", ylab="Residuals", xlab="Time")
+
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(lubridate)
+library(tseries)
+library(tidyr)
+library(forecast)
+
+# Convert CRASH_DATE to Date type
+crash_data$CRASH_DATE <- ymd_hms(crash_data$CRASH_DATE)
+
+# Remove rows with null CRASH_DATE
+crash_data <- crash_data[!is.na(crash_data$CRASH_DATE), ]
+
+# Aggregate crashes by day and create a complete sequence of dates
+daily_crashes <- crash_data %>%
+  mutate(date = as.Date(CRASH_DATE)) %>%
+  group_by(date) %>%
+  summarise(daily_count = n()) %>%
+  complete(date = seq(min(date), max(date), by = "day"), fill = list(daily_count = 0))
+
+# Convert to time series object
+# Adjust the frequency according to your expected seasonal pattern (e.g., 7 for weekly, 365 for yearly)
+crash_ts <- ts(daily_crashes$daily_count, frequency=365)
+
+# Apply STL decomposition
+decomp <- stl(crash_ts, s.window="periodic", robust=TRUE)
+plot(decomp)
+```
+
+When decomposing the provided crash data using moving averages to identify seasonality, we applied the `stl()` function in R, which uses LOESS to separate the time series into trend, seasonal, and residual components. The decomposition provides the following insights:
+
+1. Seasonality: The seasonal component of the decomposition revealed clear and regular patterns that repeat over time. This indicates the presence of seasonality in the crash data, suggesting that the number of crashes fluctuates in a predictable manner within each period (e.g., monthly, quarterly, or yearly).
+
+2. Trend: The trend component exhibited a long-term pattern in the crash data. From the plot, it appears there is a downward trend over the time span of the data. This suggests that the overall number of crashes has been decreasing over time.
+
+3. Residuals: The residuals, representing the remainder of the time series after the trend and seasonal components have been removed, should ideally resemble white noise if the model has effectively captured the underlying patterns. The residuals in your plot show that most of the systematic information (trend and seasonality) has been successfully extracted from the data, leaving behind the random fluctuations.
+
+In conclusion, the time series decomposition was effective in isolating the seasonality of traffic crashes in the data, showcasing patterns that could be tied to specific times of the year, potentially due to weather conditions, traffic flow variations, or other cyclical factors. The decreasing trend component could indicate improvements in traffic management, vehicle safety, or other factors contributing to road safety over time. The randomness of the residuals indicates a good model fit for the trend and seasonal components. These insights can be instrumental for stakeholders interested in understanding temporal dynamics in crash data, and can help guide targeted interventions at times when crashes are more likely to occur.

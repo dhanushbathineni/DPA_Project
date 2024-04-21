@@ -1,0 +1,533 @@
+---
+title: "crasher over annual time"
+author: "Narendra"
+date: "2024-04-20"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+# Set the file path
+file_path <- "C:/Users/naren/Downloads/cleaned_crash_data.csv"
+
+# Load the CSV file into a data frame
+data <- read.csv(file_path, colClasses = "character")
+
+# Now 'data' contains your CSV data, and you can work with it as needed
+
+colnames(data)
+
+```
+
+```{r}
+# Load necessary library for data manipulation and plotting
+library(dplyr)
+library(ggplot2)
+
+# Convert CRASH_DATE to date format if it's not already
+data$CRASH_DATE <- as.Date(data$CRASH_DATE)
+
+# Extract year from CRASH_DATE
+data$Year <- lubridate::year(data$CRASH_DATE)
+
+# Count the number of crashes for each year
+crashes_per_year <- data %>%
+  group_by(Year) %>%
+  summarise(Count = n())
+
+# Identify top 5 years with the highest number of crashes
+top_5_years <- crashes_per_year %>%
+  arrange(desc(Count)) %>%
+  head(5)
+
+# Plot the top 5 annual crashes over time
+ggplot(top_5_years, aes(x = Year, y = Count)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 5 Annual Crashes Over Time",
+       x = "Year",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+
+
+
+
+
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Group by crash location and count the number of crashes
+location_crash_counts <- data %>%
+  group_by(full_address) %>%
+  summarise(total_crashes = n()) %>%
+  arrange(desc(total_crashes)) # Arrange in descending order of crash counts
+
+# Select the top 5 locations with the highest crash counts
+top_5_locations <- location_crash_counts %>%
+  top_n(5, total_crashes)
+
+# Retrieve full details of the top 5 locations
+top_5_details <- data %>%
+  filter(full_address %in% top_5_locations$full_address)
+
+# Display the top 5 locations with their full details
+print(top_5_details)
+
+# Plot the top 5 locations with the highest crash counts
+ggplot(top_5_locations, aes(x = reorder(full_address, -total_crashes), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Top 5 Locations with Highest Crash Counts",
+       x = "Location",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()
+
+
+```
+
+```{r}
+# Filter data for '10000 W OHARE ST Chicago, IL'
+ohare_crashes <- data %>%
+  filter(full_address=="10000 W OHARE ST Chicago, IL")
+
+# Convert CRASH_DATE to date format
+ohare_crashes$CRASH_DATE <- as.Date(ohare_crashes$CRASH_DATE)
+
+# Extract year from CRASH_DATE
+ohare_crashes$CRASH_YEAR <- lubridate::year(ohare_crashes$CRASH_DATE)
+
+# Group by year and count the number of crashes
+ohare_crashes_yearly <- ohare_crashes %>%
+  group_by(CRASH_YEAR) %>%
+  summarise(total_crashes = n()) %>%
+  arrange(desc(total_crashes)) %>%
+  top_n(5, total_crashes)
+
+# Plot crashes over top 5 years
+ggplot(ohare_crashes_yearly, aes(x = factor(CRASH_YEAR), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Crashes on 10000 W OHARE ST Chicago, IL (Top 5 Years)",
+       x = "Year",
+       y = "Number of Crashes") +
+  theme_minimal()
+```
+
+```{r}
+# Filter data for '10000 W OHARE ST Chicago, IL'
+ohare_crashes <- data %>%
+  filter(full_address == "10000 W OHARE ST Chicago, IL")
+
+# Convert CRASH_DATE to date format
+ohare_crashes$CRASH_DATE <- as.Date(ohare_crashes$CRASH_DATE)
+
+# Extract year from CRASH_DATE
+ohare_crashes$CRASH_YEAR <- lubridate::year(ohare_crashes$CRASH_DATE)
+
+# Group by primary contributing cause for the top year
+top_year <- ohare_crashes %>%
+  group_by(PRIM_CONTRIBUTORY_CAUSE) %>%
+  filter(CRASH_YEAR == max(CRASH_YEAR)) %>%
+  summarise(total_crashes = n()) %>%
+  arrange(desc(total_crashes)) %>%
+  top_n(5, total_crashes)
+
+# Plot reasons for crashes in the top year
+ggplot(top_year, aes(x = reorder(PRIM_CONTRIBUTORY_CAUSE, -total_crashes), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Primary Contributing Causes of Crashes on 10000 W OHARE ST Chicago, IL (Top Year)",
+       x = "Primary Contributing Cause",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()
+```
+
+```{r}
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'ggplot2' package is installed, if not, install it using install.packages("ggplot2")
+
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+data<-read.csv(file_path, colClasses = "character")
+
+# Filter data for '10000 W OHARE ST Chicago, IL'
+ohare_crashes <- data %>%
+  filter(full_address=="10000 W OHARE ST Chicago, IL")
+
+ohare_crashes <- data %>%
+  filter(STREET_NAME == "OHARE ST" & STREET_NO == 10000)
+
+# Convert CRASH_DATE to datetime format
+ohare_crashes$CRASH_DATE <- as.POSIXct(ohare_crashes$CRASH_DATE)
+
+# Extract crash hour
+ohare_crashes <- ohare_crashes %>%
+  mutate(CRASH_HOUR = hour(CRASH_DATE))
+
+# Group by crash hour and count the number of crashes
+crashes_by_hour <- ohare_crashes %>%
+  group_by(CRASH_HOUR) %>%
+  summarise(total_crashes = n())
+
+# Plot the bar plot
+ggplot(crashes_by_hour, aes(x = factor(CRASH_HOUR), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 10000 W OHARE ST Chicago, IL by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Crashes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+```{r}
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'ggplot2' package is installed, if not, install it using install.packages("ggplot2")
+
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+data<-read.csv(file_path, colClasses = "character")
+# Filter data for '10000 W OHARE ST Chicago, IL'
+ohare_crashes <- data %>%
+  filter(full_address=="10000 W OHARE ST Chicago, IL")
+
+# Convert CRASH_DATE to datetime format
+ohare_crashes$CRASH_DATE <- as.POSIXct(ohare_crashes$CRASH_DATE)
+
+# Extract day of the week
+ohare_crashes <- ohare_crashes %>%
+  mutate(CRASH_DAY_OF_WEEK = wday(CRASH_DATE, label = TRUE))
+
+# Group by day of the week and count the number of crashes
+crashes_by_day <- ohare_crashes %>%
+  group_by(CRASH_DAY_OF_WEEK) %>%
+  summarise(total_crashes = n())
+
+# Reorder the days of the week
+crashes_by_day$CRASH_DAY_OF_WEEK <- factor(crashes_by_day$CRASH_DAY_OF_WEEK, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
+
+# Plot the bar plot
+ggplot(crashes_by_day, aes(x = CRASH_DAY_OF_WEEK, y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 10000 W OHARE ST Chicago, IL by Day of the Week",
+       x = "Day of the Week",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Filter data for '5700 S LAKE SHORE DR Chicago, IL'
+lakeshore <- data %>%
+  filter(full_address=="5700 S LAKE SHORE DR Chicago, IL")
+
+# Convert CRASH_DATE to date format
+lakeshore$CRASH_DATE <- as.Date(lakeshore$CRASH_DATE)
+
+# Extract year from CRASH_DATE
+lakeshore$CRASH_YEAR <- lubridate::year(lakeshore$CRASH_DATE)
+
+# Group by year and count the number of crashes
+lakeshore_yearly <- lakeshore %>%
+  group_by(CRASH_YEAR) %>%
+  summarise(total_crashes = n()) %>%
+  arrange(desc(total_crashes)) %>%
+  top_n(5, total_crashes)
+
+# Plot crashes over top 5 years
+ggplot(lakeshore_yearly, aes(x = factor(CRASH_YEAR), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Crashes on 5700 S LAKE SHORE DR Chicago, IL (Top 5 Years)",
+       x = "Year",
+       y = "Number of Crashes") +
+  theme_minimal()
+```
+
+```{r}
+# Filter data for '5700 S LAKE SHORE DR Chicago, IL'
+lakeshore <- data %>%
+  filter(full_address == "5700 S LAKE SHORE DR Chicago, IL")
+
+# Convert CRASH_DATE to date format
+lakeshore$CRASH_DATE <- as.Date(lakeshore$CRASH_DATE)
+
+# Extract year from CRASH_DATE
+lakeshore$CRASH_YEAR <- lubridate::year(lakeshore$CRASH_DATE)
+
+# Group by primary contributing cause for the top year
+top_year <- lakeshore %>%
+  group_by(PRIM_CONTRIBUTORY_CAUSE) %>%
+  filter(CRASH_YEAR == max(CRASH_YEAR)) %>%
+  summarise(total_crashes = n()) %>%
+  arrange(desc(total_crashes)) %>%
+  top_n(5, total_crashes)
+
+# Plot reasons for crashes in the top year
+ggplot(top_year, aes(x = reorder(PRIM_CONTRIBUTORY_CAUSE, -total_crashes), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Primary Contributing Causes of Crashes on 5700 S LAKE SHORE DR Chicago, IL (Top Year)",
+       x = "Primary Contributing Cause",
+       y = "Number of Crashes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'file_path' contains the file path to your data file
+
+# Read the data from CSV file
+data <- read.csv(file_path, colClasses = "character")
+
+# Filter data for '5700 S LAKE SHORE DR Chicago, IL'
+lakeshore <- data %>%
+  filter(full_address == "5700 S LAKE SHORE DR Chicago, IL")
+
+# Convert CRASH_DATE to datetime format
+lakeshore$CRASH_DATE <- as.POSIXct(lakeshore$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+
+# Extract crash hour
+lakeshore <- lakeshore %>%
+  mutate(CRASH_HOUR = hour(CRASH_DATE))
+
+# Check the CRASH_HOUR values
+lakeshore$CRASH_HOUR
+
+crashes_by_hour <- lakeshore %>%
+  group_by(CRASH_HOUR) %>%
+  summarise(total_crashes = n())
+
+# Plot the bar plot
+ggplot(crashes_by_hour, aes(x = factor(CRASH_HOUR), y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 5700 S LAKE SHORE DR Chicago, IL by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Crashes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+```
+
+```{r}
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'ggplot2' package is installed, if not, install it using install.packages("ggplot2")
+
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+data<-read.csv(file_path, colClasses = "character")
+# Filter data for '5700 S LAKE SHORE DR Chicago, IL'
+lakeshore <- data %>%
+  filter(full_address=="5700 S LAKE SHORE DR Chicago, IL")
+
+# Convert CRASH_DATE to datetime format
+lakeshore$CRASH_DATE <- as.POSIXct(lakeshore$CRASH_DATE)
+
+# Extract day of the week
+lakeshore <- lakeshore %>%
+  mutate(CRASH_DAY_OF_WEEK = wday(CRASH_DATE, label = TRUE))
+
+# Group by day of the week and count the number of crashes
+crashes_by_day <- lakeshore %>%
+  group_by(CRASH_DAY_OF_WEEK) %>%
+  summarise(total_crashes = n())
+
+# Reorder the days of the week
+crashes_by_day$CRASH_DAY_OF_WEEK <- factor(crashes_by_day$CRASH_DAY_OF_WEEK, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
+
+# Plot the bar plot
+ggplot(crashes_by_day, aes(x = CRASH_DAY_OF_WEEK, y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 5700 S LAKE SHORE DR Chicago, IL by Day of the Week",
+       x = "Day of the Week",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'file_path' contains the file path to your data file
+
+# Read the data from CSV file
+data <- read.csv(file_path, colClasses = "character")
+
+# Filter data for '7900 S STONY ISLAND AVE Chicago, IL'
+stony_island_crashes <- data %>%
+  filter(full_address == "7900 S STONY ISLAND AVE Chicago, IL")
+
+# Group by year and count the number of crashes
+crashes_by_year <- stony_island_crashes %>%
+  group_by(year = format(as.Date(CRASH_DATE), "%Y")) %>%
+  summarise(total_crashes = n())
+
+# Arrange by total crashes in descending order and select top 5 years
+top_5_years <- crashes_by_year %>%
+  arrange(desc(total_crashes)) %>%
+  head(5)
+
+# Print the top 5 years with the most crashes
+print(top_5_years)
+
+# Plot the top 5 years with the most crashes
+ggplot(top_5_years, aes(x = year, y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Top 5 Years with the Most Crashes on 7900 S STONY ISLAND AVE Chicago, IL",
+       x = "Year",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'file_path' contains the file path to your data file
+
+# Read the data from CSV file
+data <- read.csv(file_path, colClasses = "character")
+
+# Filter data for '7900 S STONY ISLAND AVE Chicago, IL'
+stony_island_crashes <- data %>%
+  filter(full_address == "7900 S STONY ISLAND AVE Chicago, IL")
+
+# Group by primary contributory cause and count the number of crashes
+primary_causes <- stony_island_crashes %>%
+  group_by(PRIM_CONTRIBUTORY_CAUSE) %>%
+  summarise(total_crashes = n())
+
+# Arrange by total crashes in descending order
+primary_causes <- primary_causes %>%
+  arrange(desc(total_crashes))
+
+# Select top 5 primary contributory causes
+top_5_primary_causes <- primary_causes %>%
+  head(5)
+
+# Print the top 5 primary reasons for crashes
+print(top_5_primary_causes)
+
+# Plot the top 5 primary contributory causes for crashes with axes interchanged
+ggplot(top_5_primary_causes, aes(x = total_crashes, y = reorder(PRIM_CONTRIBUTORY_CAUSE, total_crashes))) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Top 5 Primary Contributory Causes for Crashes on 7900 S STONY ISLAND AVE Chicago, IL",
+       x = "Number of Crashes",
+       y = "Primary Contributory Cause") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(hjust = 1))
+
+
+```
+
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'file_path' contains the file path to your data file
+
+# Read the data from CSV file
+data <- read.csv(file_path, colClasses = "character")
+
+# Filter data for '7900 S STONY ISLAND AVE Chicago, IL'
+stony_island_crashes <- data %>%
+  filter(full_address == "7900 S STONY ISLAND AVE Chicago, IL")
+
+# Convert CRASH_DATE to datetime format
+stony_island_crashes$CRASH_DATE <- as.POSIXct(stony_island_crashes$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+
+# Extract hour of the day from CRASH_DATE
+stony_island_crashes <- stony_island_crashes %>%
+  mutate(CRASH_HOUR = hour(CRASH_DATE))
+
+# Group by hour of the day and count the number of crashes
+crashes_by_hour <- stony_island_crashes %>%
+  group_by(CRASH_HOUR) %>%
+  summarise(total_crashes = n())
+
+# Plot the bar plot
+ggplot(crashes_by_hour, aes(x = CRASH_HOUR, y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 7900 S STONY ISLAND AVE Chicago, IL by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+```
+
+```{r}
+# Assuming 'data' is your dataset containing the crash data
+# Assuming 'ggplot2' package is installed, if not, install it using install.packages("ggplot2")
+
+# Load required libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+# Filter data for '7900 S STONY ISLAND AVE Chicago, IL'
+stony_island_crashes <- data %>%
+  filter(full_address == "7900 S STONY ISLAND AVE Chicago, IL")
+
+# Convert CRASH_DATE to datetime format
+stony_island_crashes$CRASH_DATE <- as.POSIXct(stony_island_crashes$CRASH_DATE)
+
+# Extract day of the week
+stony_island_crashes <- stony_island_crashes %>%
+  mutate(CRASH_DAY_OF_WEEK = wday(CRASH_DATE, label = TRUE))
+
+# Group by day of the week and count the number of crashes
+crashes_by_day <- stony_island_crashes %>%
+  group_by(CRASH_DAY_OF_WEEK) %>%
+  summarise(total_crashes = n())
+
+# Plot the bar plot
+ggplot(crashes_by_day, aes(x = CRASH_DAY_OF_WEEK, y = total_crashes)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Number of Crashes on 7900 S STONY ISLAND AVE Chicago, IL by Day of the Week",
+       x = "Day of the Week",
+       y = "Number of Crashes") +
+  theme_minimal()
+
+```

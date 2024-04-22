@@ -1,0 +1,361 @@
+---
+title: "Project_2"
+author: "NAGA SAI KUMAR POTTI"
+date: "2024-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = 
+'C:/Users/nagas/OneDrive/Desktop/DPA')
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(caret) # For machine learning algorithms
+library(randomForest) # For random forest algorithm
+
+# Load the cleaned crash data
+crash_data <- read.csv("cleaned_crash_data.csv")
+
+# Identify correlations between various factors and frequency/severity of traffic crashes
+# Calculate correlation matrix for numerical variables
+
+total_injuries <- sum(crash_data$INJURIES_TOTAL, na.rm = TRUE)
+correlation_matrix <- crash_data %>%
+  select(CRASH_HOUR, INJURIES_TOTAL,) %>%
+  cor(use = "complete.obs")
+
+# Print the correlation matrix
+print(correlation_matrix)
+
+# Plot the correlation matrix
+ggplot(data = as.data.frame(as.table(correlation_matrix)), aes(Var1, Var2, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", midpoint = 0) +
+  labs(title = "Correlation Matrix") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Investigate the relationship between categorical variables and crash frequency
+# Visualize the relationship between weather conditions and crash frequency
+weather_freq <- crash_data %>%
+  group_by(WEATHER_CONDITION) %>%
+  summarise(crash_count = n())
+# Develop predictive models to forecast traffic crash occurrence and severity
+
+# Prepare data for modeling
+# Select relevant features and target variables
+features <- crash_data %>%
+  select(CRASH_HOUR,CRASH_DAY_OF_WEEK,CRASH_MONTH,WEATHER_CONDITION, ROADWAY_SURFACE_COND)
+
+# Convert categorical features to factors
+features$CRASH_DAY_OF_WEEK <- as.factor(features$CRASH_DAY_OF_WEEK)
+features$CRASH_MONTH <- as.factor(features$CRASH_MONTH)
+features$WEATHER_CONDITION <- as.factor(features$WEATHER_CONDITION)
+features$ROADWAY_SURFACE_COND <- as.factor(features$ROADWAY_SURFACE_COND)
+
+# Define the target variables
+target_total_injuries <- crash_data$INJURIES_TOTAL
+
+# Split data into training and testing sets
+set.seed(42)
+train_index <- createDataPartition(target_total_injuries, p = 0.8, list = FALSE)
+train_features <- features[train_index, ]
+test_features <- features[-train_index, ]
+train_target <- target_total_injuries[train_index]
+test_target <- target_total_injuries[-train_index]
+```
+
+```{r}
+# Train a random forest model
+set.seed(42)
+rf_model <- randomForest(x = train_features, y = train_target)
+
+# Evaluate the model
+predictions <- predict(rf_model, test_features)
+evaluation <- postResample(pred = predictions, obs = test_target)
+
+# Print evaluation metrics
+print(evaluation)
+
+# Plot feature importance
+importance_df <- data.frame(
+  feature = rownames(rf_model$importance),
+  importance = rf_model$importance[, 1]
+)
+
+ggplot(importance_df, aes(x = reorder(feature, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Feature", y = "Importance", title = "Feature Importance in Random Forest Model") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#plot of injured count wrt crash day of the week
+crash_data$CRASH_DATE <- as.POSIXct(crash_data$CRASH_DATE, format = "%Y-%m-%d %H:%M:%S")
+
+# Extract day of the week from CRASH_DATE and label it
+crash_data$day_of_week <- wday(crash_data$CRASH_DATE, label = TRUE)
+
+# Group the data by day of the week and summarize to count the number of crashes for each day
+day_of_week_counts <- crash_data %>%
+  group_by(day_of_week) %>%
+  summarise(count = n()) %>%
+  arrange(day_of_week)
+
+# Create a bar plot of the count of crashes for each day of the week
+ggplot(day_of_week_counts, aes(x = day_of_week, y = count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Day of the Week", y = "Number of Crashes", title = "Crash Count by Day of the Week") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# plot of injured count wrt traffic control device 
+traffic_control_counts <- crash_data %>%
+  group_by(TRAFFIC_CONTROL_DEVICE) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+# Create a bar plot comparing the count of crashes for each type of traffic control device
+ggplot(traffic_control_counts, aes(x = reorder(TRAFFIC_CONTROL_DEVICE, count), y = count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Traffic Control Device", y = "Number of Crashes", title = "Count of Crashes by Traffic Control Device") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r}
+first_crash_type_counts <- crash_data %>%
+  group_by(FIRST_CRASH_TYPE) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+# Create a bar plot comparing the count of crashes for each first crash type
+ggplot(first_crash_type_counts, aes(x = reorder(FIRST_CRASH_TYPE, count), y = count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "First Crash Type", y = "Number of Crashes", title = "Count of Crashes by First Crash Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+#plot of injured counts wrt posted speed
+posted_speed_counts <- crash_data %>%
+  group_by(POSTED_SPEED_LIMIT) %>%
+  summarise(count = n()) %>%
+  arrange(POSTED_SPEED_LIMIT)
+
+# Create a bar plot comparing the count of crashes for each posted speed limit
+ggplot(posted_speed_counts, aes(x = factor(POSTED_SPEED_LIMIT), y = count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Posted Speed Limit (mph)", y = "Number of Crashes", title = "Count of Crashes by Posted Speed Limit") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#For modeling the likelihood of crashes resulting in injuries: Use logistic regression.
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Data preparation
+# Ensure outcome variable (e.g., whether a crash resulted in injuries or not) is binary
+crash_data$injury_occurred <- ifelse(crash_data$INJURIES_TOTAL > 0, 1, 0)
+
+# Convert categorical variables to factors
+crash_data$FIRST_CRASH_TYPE <- as.factor(crash_data$FIRST_CRASH_TYPE)
+crash_data$POSTED_SPEED_LIMIT <- as.factor(crash_data$POSTED_SPEED_LIMIT)
+
+# Logistic regression model
+logistic_model <- glm(injury_occurred ~ FIRST_CRASH_TYPE + POSTED_SPEED_LIMIT + CRASH_DAY_OF_WEEK, 
+                      data = crash_data, 
+                      family = binomial())
+
+# Print the summary of the logistic regression model
+summary(logistic_model)
+```
+
+
+```{r}
+# Load required libraries
+library(caret)
+library(randomForest)
+
+# Load the cleaned crash data
+crash_data <- read.csv("cleaned_crash_data.csv")
+
+# Ensure the outcome variable is numeric
+crash_data$INJURIES_TOTAL <- as.numeric(crash_data$INJURIES_TOTAL)
+
+# Convert categorical variables to factors
+crash_data$FIRST_CRASH_TYPE <- as.factor(crash_data$FIRST_CRASH_TYPE)
+crash_data$POSTED_SPEED_LIMIT <- as.factor(crash_data$POSTED_SPEED_LIMIT)
+
+# Split the data into training and test sets
+set.seed(123) # For reproducibility
+train_index <- createDataPartition(crash_data$INJURIES_TOTAL, p = 0.8, list = FALSE)
+train_data <- crash_data[train_index, ]
+test_data <- crash_data[-train_index, ]
+
+# Linear regression model
+linear_model <- lm(INJURIES_TOTAL ~ FIRST_CRASH_TYPE + POSTED_SPEED_LIMIT + CRASH_DAY_OF_WEEK, data = train_data)
+
+# Predictions and RMSE for linear regression model
+linear_predictions <- predict(linear_model, newdata = test_data)
+linear_rmse <- sqrt(mean((test_data$INJURIES_TOTAL - linear_predictions)^2))
+
+# Random forest model
+random_forest_model <- randomForest(INJURIES_TOTAL ~ FIRST_CRASH_TYPE + POSTED_SPEED_LIMIT + CRASH_DAY_OF_WEEK, data = train_data)
+
+# Predictions and RMSE for random forest model
+random_forest_predictions <- predict(random_forest_model, newdata = test_data)
+random_forest_rmse <- sqrt(mean((test_data$INJURIES_TOTAL - random_forest_predictions)^2))
+
+# Print the RMSE comparison
+cat("RMSE for Linear Regression Model:", linear_rmse, "\n")
+cat("RMSE for Random Forest Model:", random_forest_rmse, "\n")
+
+# Compare RMSE
+if (linear_rmse < random_forest_rmse) {
+    cat("Linear Regression Model has a lower RMSE and is a better fit.")
+} else {
+    cat("Random Forest Model has a lower RMSE and is a better fit.")
+}
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+
+# Convert categorical variables to factors
+crash_data$WEATHER_CONDITION <- as.factor(crash_data$WEATHER_CONDITION)
+crash_data$ROADWAY_SURFACE_COND <- as.factor(crash_data$ROADWAY_SURFACE_COND)
+crash_data$TRAFFICWAY_TYPE <- as.factor(crash_data$TRAFFICWAY_TYPE)
+crash_data$CRASH_HOUR <- as.factor(crash_data$CRASH_HOUR)
+
+# Calculate crash frequency based on weather conditions
+weather_freq <- crash_data %>%
+  group_by(WEATHER_CONDITION) %>%
+  summarise(crash_count = n())
+
+# Visualize crash frequency based on weather conditions
+ggplot(weather_freq, aes(x = WEATHER_CONDITION, y = crash_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Crash Frequency by Weather Condition", x = "Weather Condition", y = "Crash Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Calculate crash frequency based on roadway surface conditions
+surface_freq <- crash_data %>%
+  group_by(ROADWAY_SURFACE_COND) %>%
+  summarise(crash_count = n())
+
+# Visualize crash frequency based on roadway surface conditions
+ggplot(surface_freq, aes(x = ROADWAY_SURFACE_COND, y = crash_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Crash Frequency by Roadway Surface Condition", x = "Roadway Surface Condition", y = "Crash Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Calculate crash frequency based on time of day
+time_freq <- crash_data %>%
+  group_by(CRASH_HOUR) %>%
+  summarise(crash_count = n())
+
+# Visualize crash frequency based on time of day
+ggplot(time_freq, aes(x = CRASH_HOUR, y = crash_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Crash Frequency by Time of Day", x = "Hour of the Day", y = "Crash Count")
+
+# Calculate correlations between numerical variables
+numerical_vars <- crash_data %>%
+  select(INJURIES_TOTAL, INJURIES_FATAL, INJURIES_INCAPACITATING, INJURIES_NON_INCAPACITATING, INJURIES_REPORTED_NOT_EVIDENT)
+```
+
+
+```{r}
+# Calculate and visualize correlations using a heatmap
+correlation_matrix <- cor(numerical_vars)
+corrplot(correlation_matrix, method = "color", title = "Correlation Heatmap", addCoef.col = "black")
+
+# Use chi-squared test for association between categorical variables
+chi_sq_test_weather <- chisq.test(crash_data$WEATHER_CONDITION, crash_data$INJURIES_TOTAL)
+chi_sq_test_surface <- chisq.test(crash_data$ROADWAY_SURFACE_COND, crash_data$INJURIES_TOTAL)
+
+# Print chi-squared test results
+print(paste("Chi-squared test p-value for weather condition and injuries:", chi_sq_test_weather$p.value))
+print(paste("Chi-squared test p-value for roadway surface condition and injuries:", chi_sq_test_surface$p.value))
+```
+
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(caret)
+library(pROC) # For ROC curve
+
+# Load the dataset
+crash_data <- read.csv("cleaned_crash_data.csv")
+
+# Convert categorical variables to factors
+crash_data <- crash_data %>%
+  mutate_if(is.character, as.factor)
+
+# Handle missing values in the data by imputing
+# Use mean imputation for numeric columns and mode imputation for categorical columns
+crash_data <- crash_data %>%
+  mutate_if(is.numeric, function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x)) %>%
+  mutate_if(is.factor, function(x) ifelse(is.na(x), as.character(mode(x)), x))
+
+# Convert the target variable to a factor with two levels (1 if INJURIES_TOTAL > 0, otherwise 0)
+# Use make.names to ensure valid R variable names for factor levels
+crash_data <- crash_data %>%
+  mutate(binary_injury = factor(ifelse(INJURIES_TOTAL > 0, 1, 0),
+                                levels = c(0, 1),
+                                labels = make.names(c("No Injury", "Injury"))))
+
+# Train-test split
+set.seed(123)
+train_index <- createDataPartition(crash_data$binary_injury, p = 0.8, list = FALSE)
+train_data <- crash_data[train_index, ]
+test_data <- crash_data[-train_index, ]
+
+# Define train control with cross-validation
+train_control <- trainControl(
+  method = "cv", # Cross-validation
+  number = 10, # Number of folds
+  summaryFunction = twoClassSummary, # Summary function for binary classification
+  classProbs = TRUE # Return class probabilities
+)
+
+# Train logistic regression model with cross-validation
+logistic_model <- train(
+  binary_injury ~ ., # Formula
+  data = train_data, # Training data
+  method = "glm", # Logistic regression method
+  family = "binomial", # Use binomial family
+  trControl = train_control, # Train control settings
+  metric = "ROC" # Evaluation metric: Area Under the ROC Curve
+)
+
+# Print the model summary
+print(logistic_model)
+
+# Make predictions on the test data
+predictions <- predict(logistic_model, newdata = test_data)
+probabilities <- predict(logistic_model, newdata = test_data, type = "prob")
+
+# Evaluate the model's performance
+conf_matrix <- confusionMatrix(predictions, test_data$binary_injury)
+print(conf_matrix)
+
+# Calculate and plot the ROC curve
+roc_curve <- roc(test_data$binary_injury, probabilities[, 2])
+plot(roc_curve)
+auc <- auc(roc_curve)
+print(paste("AUC:", round(auc, 2)))
+```
